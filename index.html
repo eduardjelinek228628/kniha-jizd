@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Kniha jízd</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --text: #1b1f24;
+    --muted: #4b5563;
+    --border: #c3c9d2;
+    --accent: #0b5cad;
+    --accent-text: #ffffff;
+    --danger: #a4161a;
+    --ok-bg: #e3f4e6;
+    --ok-text: #14532d;
+    --err-bg: #fde8e8;
+    --err-text: #7f1d1d;
+    --focus: #b45309;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151a;
+      --card: #1c2128;
+      --text: #eef1f5;
+      --muted: #b4bcc8;
+      --border: #4a5360;
+      --accent: #6cb0ff;
+      --accent-text: #0a1624;
+      --danger: #ff8a8a;
+      --ok-bg: #123321;
+      --ok-text: #b7f0c8;
+      --err-bg: #3a1618;
+      --err-text: #ffc9c9;
+      --focus: #fbbf24;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 1.0625rem/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 44rem; margin: 0 auto; padding: 1rem 1rem 3rem; }
+  h1 { font-size: 1.6rem; margin: 0.5rem 0 1rem; }
+  h2 { font-size: 1.2rem; margin: 0 0 0.75rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+  }
+  label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
+  .pole { margin-bottom: 0.9rem; }
+  input {
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.5rem 0.75rem;
+    font: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 0.5rem;
+  }
+  .radek { display: flex; gap: 0.5rem; align-items: stretch; }
+  .radek input { flex: 1; min-width: 0; }
+  button {
+    min-height: 3rem;
+    min-width: 3rem;
+    padding: 0.5rem 1rem;
+    font: inherit;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 0.5rem;
+    cursor: pointer;
+  }
+  button.hlavni {
+    color: var(--accent-text);
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  button.nebezpecne { color: var(--danger); }
+  button:disabled { opacity: 0.6; cursor: progress; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .akce-formulare { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .akce-formulare .hlavni { flex: 1 1 12rem; }
+  #stav {
+    min-height: 1.5rem;
+    margin: 0 0 1rem;
+    padding: 0;
+    font-weight: 600;
+  }
+  #stav.ok, #stav.chyba { padding: 0.6rem 0.8rem; border-radius: 0.5rem; }
+  #stav.ok { background: var(--ok-bg); color: var(--ok-text); }
+  #stav.chyba { background: var(--err-bg); color: var(--err-text); }
+  .hlavicka-seznamu { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+  .souhrn { color: var(--muted); margin: 0; }
+  ul.jizdy { list-style: none; margin: 0; padding: 0; }
+  .jizda {
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    padding: 0.75rem;
+    margin-bottom: 0.6rem;
+    background: var(--card);
+  }
+  .jizda.upravuje { border-color: var(--accent); border-width: 2px; }
+  .trasa { font-weight: 700; font-size: 1.1rem; overflow-wrap: anywhere; }
+  .meta { color: var(--muted); margin: 0.15rem 0 0.5rem; }
+  .akce { display: flex; gap: 0.5rem; }
+  .akce button { flex: 1; }
+  .prazdne { color: var(--muted); }
+  .nastaveni p { margin-top: 0; }
+  [hidden] { display: none !important; }
+  @media (min-width: 40rem) {
+    .mrizka { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+    .akce button { flex: 0 0 auto; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Kniha jízd</h1>
+
+  <section class="card nastaveni" id="nastaveni" hidden aria-labelledby="nastaveni-nadpis">
+    <h2 id="nastaveni-nadpis">Připojení k tabulce</h2>
+    <p>Chybí adresa webové aplikace (Apps Script). Vlož ji sem, uloží se jen v tomto zařízení.</p>
+    <div class="pole">
+      <label for="api-url">Adresa (končí na /exec)</label>
+      <input id="api-url" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec">
+    </div>
+    <button type="button" class="hlavni" id="api-ulozit">Uložit adresu</button>
+  </section>
+
+  <section class="card" id="formular-sekce" aria-labelledby="formular-nadpis">
+    <h2 id="formular-nadpis">Nová jízda</h2>
+    <form id="formular" novalidate>
+      <div class="pole">
+        <label for="datum">Datum</label>
+        <div class="radek">
+          <input id="datum" name="datum" type="date" required>
+          <button type="button" id="dnes">Dnes</button>
+        </div>
+      </div>
+      <div class="mrizka">
+        <div class="pole">
+          <label for="odkud">Odkud</label>
+          <input id="odkud" name="odkud" type="text" list="seznam-mist" autocomplete="off" autocapitalize="sentences" enterkeyhint="next" maxlength="80" required>
+        </div>
+        <div class="pole">
+          <label for="kam">Kam</label>
+          <input id="kam" name="kam" type="text" list="seznam-mist" autocomplete="off" autocapitalize="sentences" enterkeyhint="next" maxlength="80" required>
+        </div>
+        <div class="pole">
+          <label for="km">Ujeté km</label>
+          <input id="km" name="km" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="next" required aria-describedby="km-napoveda">
+          <small id="km-napoveda" class="meta">Číslo, desetinná čárka nebo tečka.</small>
+        </div>
+        <div class="pole">
+          <label for="ridic">Řidič</label>
+          <input id="ridic" name="ridic" type="text" list="seznam-ridicu" autocomplete="off" autocapitalize="words" enterkeyhint="done" maxlength="80">
+        </div>
+      </div>
+      <datalist id="seznam-mist"></datalist>
+      <datalist id="seznam-ridicu"></datalist>
+      <div class="akce-formulare">
+        <button type="submit" class="hlavni" id="odeslat">Přidat jízdu</button>
+        <button type="button" id="zrusit" hidden>Zrušit úpravu</button>
+      </div>
+    </form>
+  </section>
+
+  <p id="stav" role="status" aria-live="polite"></p>
+
+  <section aria-labelledby="seznam-nadpis">
+    <div class="hlavicka-seznamu">
+      <h2 id="seznam-nadpis" style="margin:0">Zapsané jízdy</h2>
+      <button type="button" id="export">Exportovat do Excelu (.xlsx)</button>
+    </div>
+    <p class="souhrn" id="souhrn"></p>
+    <ul class="jizdy" id="seznam"></ul>
+  </section>
+</main>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var form = $('formular'), stav = $('stav'), seznam = $('seznam');
+  var rows = [], editId = null, busy = false;
+
+  function apiUrl() {
+    var fromQuery = new URLSearchParams(location.search).get('api');
+    if (fromQuery) { try { localStorage.setItem('kj_api', fromQuery); } catch (e) {} }
+    var stored = '';
+    try { stored = localStorage.getItem('kj_api') || ''; } catch (e) {}
+    return (window.KNIHA_JIZD_API || fromQuery || stored || '').trim();
+  }
+  var API = apiUrl();
+
+  function say(text, kind) {
+    stav.textContent = text || '';
+    stav.className = text ? (kind || '') : '';
+  }
+
+  function isoToday() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+  function fmtDate(iso) {
+    var p = iso.split('-');
+    return p.length === 3 ? (+p[2]) + '. ' + (+p[1]) + '. ' + p[0] : iso;
+  }
+  function fmtKm(n) {
+    return Number(n).toLocaleString('cs-CZ', { maximumFractionDigits: 1 });
+  }
+
+  function setBusy(b) {
+    busy = b;
+    $('odeslat').disabled = b;
+    $('export').disabled = b;
+    Array.prototype.forEach.call(seznam.querySelectorAll('button'), function (x) { x.disabled = b; });
+  }
+
+  function request(payload) {
+    var opts = payload
+      ? { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) }
+      : {};
+    var url = payload ? API : API + (API.indexOf('?') < 0 ? '?' : '&') + 'action=list';
+    return fetch(url, opts).then(function (r) {
+      if (!r.ok) throw new Error('Server vrátil chybu ' + r.status + '.');
+      return r.json();
+    }).then(function (j) {
+      if (!j.ok) throw new Error(j.error || 'Něco se nepovedlo.');
+      return j;
+    });
+  }
+
+  function refreshLists() {
+    function fill(id, values) {
+      var dl = $(id);
+      dl.textContent = '';
+      values.forEach(function (v) {
+        var o = document.createElement('option');
+        o.value = v;
+        dl.appendChild(o);
+      });
+    }
+    var places = {}, drivers = {};
+    rows.forEach(function (r) {
+      places[r.odkud] = 1; places[r.kam] = 1;
+      if (r.ridic) drivers[r.ridic] = 1;
+    });
+    fill('seznam-mist', Object.keys(places).sort(function (a, b) { return a.localeCompare(b, 'cs'); }));
+    fill('seznam-ridicu', Object.keys(drivers).sort(function (a, b) { return a.localeCompare(b, 'cs'); }));
+  }
+
+  function render() {
+    seznam.textContent = '';
+    var total = rows.reduce(function (s, r) { return s + Number(r.km); }, 0);
+    $('souhrn').textContent = rows.length
+      ? 'Počet jízd: ' + rows.length + ', celkem ' + fmtKm(total) + ' km.'
+      : 'Zatím tu nejsou žádné jízdy.';
+    var sorted = rows.slice().reverse().sort(function (a, b) {
+      return a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : 0;
+    });
+    sorted.forEach(function (r) {
+      var li = document.createElement('li');
+      li.className = 'jizda' + (r.id === editId ? ' upravuje' : '');
+      var popis = fmtDate(r.datum) + ', ' + r.odkud + ' – ' + r.kam;
+
+      var trasa = document.createElement('div');
+      trasa.className = 'trasa';
+      trasa.textContent = r.odkud + ' → ' + r.kam;
+      var meta = document.createElement('p');
+      meta.className = 'meta';
+      meta.textContent = fmtDate(r.datum) + ' · ' + fmtKm(r.km) + ' km' + (r.ridic ? ' · ' + r.ridic : '');
+
+      var akce = document.createElement('div');
+      akce.className = 'akce';
+      var upravit = document.createElement('button');
+      upravit.type = 'button';
+      upravit.textContent = 'Upravit';
+      upravit.setAttribute('aria-label', 'Upravit jízdu ' + popis);
+      upravit.addEventListener('click', function () { startEdit(r.id); });
+      var smazat = document.createElement('button');
+      smazat.type = 'button';
+      smazat.className = 'nebezpecne';
+      smazat.textContent = 'Smazat';
+      smazat.setAttribute('aria-label', 'Smazat jízdu ' + popis);
+      smazat.addEventListener('click', function () { remove(r.id, popis); });
+      akce.appendChild(upravit);
+      akce.appendChild(smazat);
+
+      li.appendChild(trasa);
+      li.appendChild(meta);
+      li.appendChild(akce);
+      seznam.appendChild(li);
+    });
+    refreshLists();
+  }
+
+  function setRows(list) { rows = list || []; render(); }
+
+  function resetForm(keepDateAndDriver) {
+    var datum = $('datum').value, ridic = $('ridic').value;
+    form.reset();
+    if (keepDateAndDriver) { $('datum').value = datum; $('ridic').value = ridic; }
+    editId = null;
+    $('odeslat').textContent = 'Přidat jízdu';
+    $('formular-nadpis').textContent = 'Nová jízda';
+    $('zrusit').hidden = true;
+  }
+
+  function startEdit(id) {
+    var r = rows.filter(function (x) { return x.id === id; })[0];
+    if (!r) return;
+    editId = id;
+    $('datum').value = r.datum;
+    $('odkud').value = r.odkud;
+    $('kam').value = r.kam;
+    $('km').value = String(r.km).replace('.', ',');
+    $('ridic').value = r.ridic;
+    $('odeslat').textContent = 'Uložit změny';
+    $('formular-nadpis').textContent = 'Úprava jízdy';
+    $('zrusit').hidden = false;
+    say('');
+    render();
+    $('formular-sekce').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('odkud').focus({ preventScroll: true });
+  }
+
+  function validateForm() {
+    if (!$('datum').value) return ['Vyber datum, nebo klepni na „Dnes“.', 'datum'];
+    if (!$('odkud').value.trim()) return ['Vyplň, odkud jsi jel.', 'odkud'];
+    if (!$('kam').value.trim()) return ['Vyplň, kam jsi jel.', 'kam'];
+    var km = $('km').value.trim().replace(',', '.');
+    if (!/^\d+(\.\d+)?$/.test(km)) return ['Ujeté km musí být číslo, třeba 28 nebo 12,5.', 'km'];
+    return null;
+  }
+
+  $('dnes').addEventListener('click', function () { $('datum').value = isoToday(); });
+
+  $('zrusit').addEventListener('click', function () {
+    resetForm(true);
+    say('');
+    render();
+  });
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (busy) return;
+    if (!API) { $('nastaveni').hidden = false; say('Nejdřív doplň adresu připojení.', 'chyba'); return; }
+    var bad = validateForm();
+    if (bad) { say(bad[0], 'chyba'); $(bad[1]).focus(); return; }
+    var payload = {
+      action: editId ? 'update' : 'add',
+      id: editId,
+      datum: $('datum').value,
+      odkud: $('odkud').value.trim(),
+      kam: $('kam').value.trim(),
+      km: $('km').value.trim().replace(',', '.'),
+      ridic: $('ridic').value.trim()
+    };
+    var wasEdit = !!editId;
+    setBusy(true);
+    say('Ukládám…');
+    request(payload).then(function (j) {
+      setRows(j.rows);
+      resetForm(true);
+      say(wasEdit ? 'Změny uloženy.' : 'Jízda přidána.', 'ok');
+    }).catch(function (e) {
+      say('Uložení se nepovedlo: ' + e.message, 'chyba');
+    }).then(function () { setBusy(false); });
+  });
+
+  function remove(id, popis) {
+    if (busy) return;
+    if (!window.confirm('Opravdu smazat jízdu?\n' + popis)) return;
+    setBusy(true);
+    say('Mažu…');
+    request({ action: 'delete', id: id }).then(function (j) {
+      if (editId === id) resetForm(true);
+      setRows(j.rows);
+      say('Jízda smazána.', 'ok');
+    }).catch(function (e) {
+      say('Smazání se nepovedlo: ' + e.message, 'chyba');
+    }).then(function () { setBusy(false); });
+  }
+
+  $('export').addEventListener('click', function () {
+    if (busy) return;
+    if (!API) { $('nastaveni').hidden = false; say('Nejdřív doplň adresu připojení.', 'chyba'); return; }
+    setBusy(true);
+    say('Připravuji export, může to trvat několik sekund…');
+    var url = API + (API.indexOf('?') < 0 ? '?' : '&') + 'action=export';
+    fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('Server vrátil chybu ' + r.status + '.');
+      return r.json();
+    }).then(function (j) {
+      if (!j.ok) throw new Error(j.error || 'Export selhal.');
+      var bin = atob(j.base64), bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = j.filename || 'kniha-jizd.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+      say('Export hotový: ' + a.download, 'ok');
+    }).catch(function (e) {
+      say('Export se nepovedl: ' + e.message, 'chyba');
+    }).then(function () { setBusy(false); });
+  });
+
+  $('api-ulozit').addEventListener('click', function () {
+    var v = $('api-url').value.trim();
+    if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(v)) {
+      say('Adresa musí začínat https://script.google.com a končit /exec.', 'chyba');
+      $('api-url').focus();
+      return;
+    }
+    try { localStorage.setItem('kj_api', v); } catch (e) {}
+    API = v;
+    $('nastaveni').hidden = true;
+    say('');
+    load();
+  });
+
+  function load() {
+    if (!API) { $('nastaveni').hidden = false; render(); return; }
+    say('Načítám jízdy…');
+    request(null).then(function (j) {
+      setRows(j.rows);
+      say('');
+    }).catch(function (e) {
+      render();
+      say('Jízdy se nepodařilo načíst: ' + e.message, 'chyba');
+    });
+  }
+
+  render();
+  load();
+})();
+</script>
+</body>
+</html>
