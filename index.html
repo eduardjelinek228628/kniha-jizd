@@ -118,6 +118,31 @@
   .akce button { flex: 1; }
   .prazdne { color: var(--muted); }
   .nastaveni p { margin-top: 0; }
+  .kombo { position: relative; }
+  .navrhy {
+    position: absolute;
+    left: 0; right: 0; top: 100%;
+    z-index: 20;
+    margin: 0.25rem 0 0;
+    padding: 0;
+    list-style: none;
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 0.5rem;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+    overflow: hidden;
+  }
+  .navrhy li {
+    min-height: 3rem;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+    border-top: 1px solid var(--border);
+  }
+  .navrhy li:first-child { border-top: 0; }
+  .navrhy li[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
   [hidden] { display: none !important; }
   @media (min-width: 40rem) {
     .mrizka { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
@@ -153,11 +178,17 @@
       <div class="mrizka">
         <div class="pole">
           <label for="odkud">Odkud</label>
-          <input id="odkud" name="odkud" type="text" list="seznam-mist" autocomplete="off" autocapitalize="sentences" enterkeyhint="next" maxlength="80" required>
+          <div class="kombo">
+            <input id="odkud" name="odkud" type="text" autocomplete="off" autocapitalize="sentences" spellcheck="false" enterkeyhint="next" maxlength="80" required role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="navrhy-odkud">
+            <ul class="navrhy" id="navrhy-odkud" role="listbox" aria-label="Návrhy míst" hidden></ul>
+          </div>
         </div>
         <div class="pole">
           <label for="kam">Kam</label>
-          <input id="kam" name="kam" type="text" list="seznam-mist" autocomplete="off" autocapitalize="sentences" enterkeyhint="next" maxlength="80" required>
+          <div class="kombo">
+            <input id="kam" name="kam" type="text" autocomplete="off" autocapitalize="sentences" spellcheck="false" enterkeyhint="next" maxlength="80" required role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="navrhy-kam">
+            <ul class="navrhy" id="navrhy-kam" role="listbox" aria-label="Návrhy míst" hidden></ul>
+          </div>
         </div>
         <div class="pole">
           <label for="km">Ujeté km</label>
@@ -166,11 +197,12 @@
         </div>
         <div class="pole">
           <label for="ridic">Řidič</label>
-          <input id="ridic" name="ridic" type="text" list="seznam-ridicu" autocomplete="off" autocapitalize="words" enterkeyhint="done" maxlength="80">
+          <div class="kombo">
+            <input id="ridic" name="ridic" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" maxlength="80" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="navrhy-ridic">
+            <ul class="navrhy" id="navrhy-ridic" role="listbox" aria-label="Návrhy řidičů" hidden></ul>
+          </div>
         </div>
       </div>
-      <datalist id="seznam-mist"></datalist>
-      <datalist id="seznam-ridicu"></datalist>
       <div class="akce-formulare">
         <button type="submit" class="hlavni" id="odeslat">Přidat jízdu</button>
         <button type="button" id="zrusit" hidden>Zrušit úpravu</button>
@@ -248,24 +280,82 @@
     });
   }
 
+  var placeList = [], driverList = [];
   function refreshLists() {
-    function fill(id, values) {
-      var dl = $(id);
-      dl.textContent = '';
-      values.forEach(function (v) {
-        var o = document.createElement('option');
-        o.value = v;
-        dl.appendChild(o);
-      });
-    }
     var places = {}, drivers = {};
     rows.forEach(function (r) {
       places[r.odkud] = 1; places[r.kam] = 1;
       if (r.ridic) drivers[r.ridic] = 1;
     });
-    fill('seznam-mist', Object.keys(places).sort(function (a, b) { return a.localeCompare(b, 'cs'); }));
-    fill('seznam-ridicu', Object.keys(drivers).sort(function (a, b) { return a.localeCompare(b, 'cs'); }));
+    var byCs = function (a, b) { return a.localeCompare(b, 'cs'); };
+    placeList = Object.keys(places).sort(byCs);
+    driverList = Object.keys(drivers).sort(byCs);
   }
+
+  // Vlastní našeptávač (nativní datalist na některých Samsung prohlížečích nejde vybrat).
+  function norm(s) {
+    return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  }
+  function attachCombo(input, listEl, getValues) {
+    var items = [], active = -1;
+    function close() {
+      listEl.hidden = true;
+      listEl.textContent = '';
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+      items = []; active = -1;
+    }
+    function choose(v) {
+      input.value = v;
+      close();
+    }
+    function setActive(i) {
+      active = i;
+      Array.prototype.forEach.call(listEl.children, function (li, k) {
+        li.setAttribute('aria-selected', k === i ? 'true' : 'false');
+      });
+      if (i >= 0) input.setAttribute('aria-activedescendant', listEl.children[i].id);
+      else input.removeAttribute('aria-activedescendant');
+    }
+    function open() {
+      var q = norm(input.value.trim());
+      items = getValues().filter(function (v) {
+        var n = norm(v);
+        return n !== q && (!q || n.indexOf(q) !== -1);
+      }).slice(0, 6);
+      listEl.textContent = '';
+      if (!items.length) { close(); return; }
+      items.forEach(function (v, k) {
+        var li = document.createElement('li');
+        li.id = listEl.id + '-' + k;
+        li.setAttribute('role', 'option');
+        li.setAttribute('aria-selected', 'false');
+        li.textContent = v;
+        li.addEventListener('mousedown', function (e) { e.preventDefault(); }); // nechá fokus v poli
+        li.addEventListener('click', function () { choose(v); });
+        listEl.appendChild(li);
+      });
+      listEl.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
+      active = -1;
+    }
+    input.addEventListener('input', open);
+    input.addEventListener('focus', function () { if (!input.value) open(); });
+    input.addEventListener('blur', close);
+    input.addEventListener('keydown', function (e) {
+      if (listEl.hidden) {
+        if (e.key === 'ArrowDown') { open(); if (items.length) { setActive(0); e.preventDefault(); } }
+        return;
+      }
+      if (e.key === 'ArrowDown') { setActive((active + 1) % items.length); e.preventDefault(); }
+      else if (e.key === 'ArrowUp') { setActive((active - 1 + items.length) % items.length); e.preventDefault(); }
+      else if (e.key === 'Enter' && active >= 0) { choose(items[active]); e.preventDefault(); }
+      else if (e.key === 'Escape') { close(); }
+    });
+  }
+  attachCombo($('odkud'), $('navrhy-odkud'), function () { return placeList; });
+  attachCombo($('kam'), $('navrhy-kam'), function () { return placeList; });
+  attachCombo($('ridic'), $('navrhy-ridic'), function () { return driverList; });
 
   function render() {
     seznam.textContent = '';
